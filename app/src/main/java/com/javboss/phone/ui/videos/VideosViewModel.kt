@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
-import com.javboss.phone.data.api.AuthExpiredException
 import com.javboss.phone.data.api.dto.VideoDto
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -68,8 +67,6 @@ class VideosViewModel(app: Application) : AndroidViewModel(app) {
                     loading = false,
                     endReached = res.items.size >= res.total,
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loading = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loading = false, error = e.message ?: "加载失败")
             }
@@ -91,8 +88,6 @@ class VideosViewModel(app: Application) : AndroidViewModel(app) {
                     loadingMore = false,
                     endReached = merged.size >= res.total || res.items.isEmpty(),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loadingMore = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loadingMore = false, error = e.message ?: "加载失败")
             }

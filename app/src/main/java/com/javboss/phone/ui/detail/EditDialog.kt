@@ -151,7 +151,7 @@ fun EditDialog(
                     Spacer(Modifier.height(8.dp))
                     EntityDropdown(
                         label = "系列",
-                        entries = opts.series.map { it.id to it.name },
+                        entries = opts.series.map { it.id to it.displayName },
                         selectedId = seriesId,
                         onSelect = { seriesId = it },
                     )

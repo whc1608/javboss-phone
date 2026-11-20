@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
-import com.javboss.phone.data.api.AuthExpiredException
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
@@ -63,7 +62,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                         else container.apiClient.parseError(body)
                     }
                     is IOException -> "无法连接服务器，请检查地址和网络"
-                    is AuthExpiredException -> "登录状态异常，请重试"
                     else -> e.message ?: "登录失败"
                 }
                 uiState = uiState.copy(loading = false, error = message)

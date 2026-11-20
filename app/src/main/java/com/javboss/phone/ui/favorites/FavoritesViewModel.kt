@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
-import com.javboss.phone.data.api.AuthExpiredException
 import com.javboss.phone.data.api.dto.FavoriteGroupDto
 import com.javboss.phone.data.api.dto.FavoriteItemDto
 import kotlinx.coroutines.launch
@@ -37,8 +36,6 @@ class FavoritesViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val groups = container.favoriteRepository.listGroups()
                 uiState = uiState.copy(groups = groups, loading = false)
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loading = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loading = false, error = e.message ?: "加载失败")
             }
@@ -51,8 +48,6 @@ class FavoritesViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 container.favoriteRepository.createGroup(name.trim())
                 refresh()
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "创建失败：名称可能为空或已存在")
             }
@@ -65,8 +60,6 @@ class FavoritesViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 container.favoriteRepository.renameGroup(id, name.trim())
                 refresh()
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "重命名失败：名称可能为空或已存在")
             }
@@ -78,8 +71,6 @@ class FavoritesViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 container.favoriteRepository.deleteGroup(id)
                 refresh()
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "删除失败")
             }
@@ -113,8 +104,6 @@ class FavGroupViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val items = container.favoriteRepository.listItems(groupId)
                 uiState = uiState.copy(items = items, loading = false)
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loading = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loading = false, error = e.message ?: "加载失败")
             }
@@ -126,8 +115,6 @@ class FavGroupViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 container.favoriteRepository.removeItems(groupId, listOf(item.id))
                 uiState = uiState.copy(items = uiState.items.filterNot { it.id == item.id })
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "移除失败")
             }
@@ -144,8 +131,6 @@ class FavGroupViewModel(app: Application) : AndroidViewModel(app) {
                 val jav = container.videoRepository.searchJavs(limit = 5, offset = 0, search = item.code)
                     .items.firstOrNull { it.code.equals(item.code, ignoreCase = true) }
                 onResolved(jav?.videos?.firstOrNull()?.id ?: 0, item.code)
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 onResolved(0, item.code)
             }

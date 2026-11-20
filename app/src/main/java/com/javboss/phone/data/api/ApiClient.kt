@@ -12,6 +12,7 @@ import com.javboss.phone.data.api.dto.JavDbUrlResponse
 import com.javboss.phone.data.api.dto.JavDto
 import com.javboss.phone.data.api.dto.JavItemUpdateRequest
 import com.javboss.phone.data.api.dto.JavListResponse
+import com.javboss.phone.data.api.dto.JavSimilarListResponse
 import com.javboss.phone.data.api.dto.JavTagsReplaceRequest
 import com.javboss.phone.data.api.dto.LoginRequest
 import com.javboss.phone.data.api.dto.LoginResponse
@@ -29,6 +30,7 @@ import com.javboss.phone.data.api.dto.TagNameRequest
 import com.javboss.phone.data.api.dto.VideoDto
 import com.javboss.phone.data.api.dto.VideoListResponse
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -87,6 +89,12 @@ interface JavBossApi {
         @Query("sort") sort: String = "",
         @Query("seed") seed: Long? = null,
     ): JavListResponse
+
+    @GET("jav/items/{id}/similar")
+    suspend fun listSimilarJavs(
+        @Path("id") id: Long,
+        @Query("limit") limit: Int = 5,
+    ): JavSimilarListResponse
 
     @GET("jav/prefixes")
     suspend fun listJavPrefixes(): List<PrefixDto>
@@ -163,9 +171,11 @@ interface JavBossApi {
     suspend fun getJavDbUrl(@Query("code") code: String): JavDbUrlResponse
 }
 
-/** 登录态失效（服务端返回 401）时抛出，UI 层捕获后跳回登录页 */
-class AuthExpiredException : Exception("登录状态已失效")
-
+/**
+ * 登录态失效（服务端返回 401）不再从拦截器抛异常：拦截器运行在 OkHttp 的工作线程上，
+ * 抛出的非 IOException 会穿过只认 IOException 的调用方（如 Coil 图片加载），导致进程崩溃。
+ * 现在改为置位 [ApiClient.sessionExpired]，由导航层统一清理会话并跳登录。
+ */
 class ApiException(val statusCode: Int, message: String) : Exception(message)
 
 /**
@@ -181,6 +191,9 @@ class ApiClient(
         coerceInputValues = true
     }
 
+    /** 会话失效事件：置位后由导航层跳登录，界面无需各自捕获异常 */
+    val sessionExpired = MutableStateFlow(false)
+
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(cookieJar)
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -189,8 +202,13 @@ class ApiClient(
             level = HttpLoggingInterceptor.Level.BASIC
         })
         .addInterceptor { chain ->
-            val response = chain.proceed(chain.request())
-            if (response.code == 401) throw AuthExpiredException()
+            val request = chain.request()
+            val response = chain.proceed(request)
+            // 登录接口的 401 表示密码错误，不属于会话失效
+            if (response.code == 401 && !request.url.encodedPath.endsWith("/auth/login")) {
+                cookieJar.clear()
+                sessionExpired.value = true
+            }
             response
         }
         .build()

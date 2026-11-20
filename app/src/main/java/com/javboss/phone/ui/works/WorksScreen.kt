@@ -184,7 +184,7 @@ fun WorksScreen(
                             WorkCard(
                                 coverUrl = viewModel.coverUrl(jav.code),
                                 code = jav.code,
-                                title = jav.title,
+                                title = jav.displayTitle,
                                 onClick = { onWorkClick(jav) },
                             )
                         }
@@ -235,10 +235,10 @@ fun WorksScreen(
                         items(state.series.items, key = { it.id }) { series ->
                             EntityCard(
                                 coverUrl = viewModel.sampleCoverUrl(series.sampleCode),
-                                name = series.name,
+                                name = series.displayName,
                                 subtitle = "${series.workCount} 部作品",
                                 onClick = {
-                                    onOpenJavList("系列：${series.name}", "", "", 0, series.id)
+                                    onOpenJavList("系列：${series.displayName}", "", "", 0, series.id)
                                 },
                             )
                         }

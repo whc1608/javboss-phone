@@ -50,7 +50,7 @@ data class VideoDto(
 ) {
     /** 展示用标题：优先 JAV 番号 + 标题，否则文件名 */
     val displayTitle: String
-        get() = jav?.let { "${it.code} ${it.title}" }?.trim() ?: filename
+        get() = jav?.let { "${it.code} ${it.displayTitle}" }?.trim() ?: filename
 }
 
 @Serializable
@@ -59,6 +59,7 @@ data class JavDto(
     val code: String = "",
     val title: String = "",
     @SerialName("title_en") val titleEn: String = "",
+    @SerialName("zh_title") val zhTitle: String = "",
     @SerialName("release_unix") val releaseUnix: Long = 0,
     @SerialName("duration_min") val durationMin: Int = 0,
     @SerialName("is_uncensored") val isUncensored: Boolean = false,
@@ -68,7 +69,10 @@ data class JavDto(
     val tags: List<TagDto> = emptyList(),
     val idols: List<IdolDto> = emptyList(),
     val videos: List<VideoDto> = emptyList(),
-)
+) {
+    /** 展示用标题：优先使用服务端已生成的中文标题 */
+    val displayTitle: String get() = zhTitle.ifBlank { title }
+}
 
 /** /jav/prefixes 返回项：番号前缀及其归属片商、作品数 */
 @Serializable
@@ -84,6 +88,24 @@ data class PrefixDto(
 data class JavListResponse(
     val items: List<JavDto> = emptyList(),
     val total: Int = 0,
+)
+
+/** /jav/items/{id}/similar 返回项：服务端已按相似度与评分排序 */
+@Serializable
+data class JavSimilarDto(
+    val id: Long = 0,
+    val code: String = "",
+    val title: String = "",
+    @SerialName("zh_title") val zhTitle: String = "",
+    val rating: Double = 0.0,
+    @SerialName("favorite_rating") val favoriteRating: Double = 0.0,
+) {
+    val displayTitle: String get() = zhTitle.ifBlank { title }
+}
+
+@Serializable
+data class JavSimilarListResponse(
+    val items: List<JavSimilarDto> = emptyList(),
 )
 
 @Serializable
@@ -125,10 +147,14 @@ data class StudioListResponse(
 data class SeriesDto(
     val id: Long = 0,
     val name: String = "",
+    @SerialName("zh_name") val zhName: String = "",
     @SerialName("studio_name") val studioName: String = "",
     @SerialName("work_count") val workCount: Int = 0,
     @SerialName("sample_code") val sampleCode: String = "",
-)
+) {
+    /** 展示用系列名：优先使用服务端中文译名 */
+    val displayName: String get() = zhName.ifBlank { name }
+}
 
 @Serializable
 data class SeriesListResponse(

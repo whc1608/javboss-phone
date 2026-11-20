@@ -111,7 +111,7 @@ fun JavListScreen(
                         WorkCard(
                             coverUrl = viewModel.coverUrl(jav.code),
                             code = jav.code,
-                            title = jav.title,
+                            title = jav.displayTitle,
                             onClick = { onWorkClick(jav) },
                         )
                     }

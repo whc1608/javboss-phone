@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
-import com.javboss.phone.data.api.AuthExpiredException
 import com.javboss.phone.data.api.dto.IdolDto
 import com.javboss.phone.data.api.dto.JavDto
 import com.javboss.phone.data.api.dto.PrefixDto
@@ -124,8 +123,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                     loading = false,
                     endReached = res.items.size >= res.total,
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loading = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loading = false, error = e.message ?: "加载失败")
             }
@@ -147,8 +144,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                     loadingMore = false,
                     endReached = merged.size >= res.total || res.items.isEmpty(),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loadingMore = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loadingMore = false, error = e.message ?: "加载失败")
             }
@@ -265,8 +260,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = res.items.size >= res.total,
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(idols = uiState.idols.copy(loading = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(
                     idols = uiState.idols.copy(loading = false),
@@ -290,8 +283,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = merged.size >= res.total || res.items.isEmpty(),
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(idols = uiState.idols.copy(loadingMore = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(idols = uiState.idols.copy(loadingMore = false))
             }
@@ -312,8 +303,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = res.items.size >= res.total,
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(studios = uiState.studios.copy(loading = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(
                     studios = uiState.studios.copy(loading = false),
@@ -337,8 +326,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = merged.size >= res.total || res.items.isEmpty(),
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(studios = uiState.studios.copy(loadingMore = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(studios = uiState.studios.copy(loadingMore = false))
             }
@@ -359,8 +346,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = res.items.size >= res.total,
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(series = uiState.series.copy(loading = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(
                     series = uiState.series.copy(loading = false),
@@ -384,8 +369,6 @@ class WorksViewModel(app: Application) : AndroidViewModel(app) {
                         endReached = merged.size >= res.total || res.items.isEmpty(),
                     ),
                 )
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(series = uiState.series.copy(loadingMore = false), sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(series = uiState.series.copy(loadingMore = false))
             }

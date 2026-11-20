@@ -13,3 +13,4 @@ app/build/
 keystore.properties
 keystore/
 AGENTS.md
+build-debug.log

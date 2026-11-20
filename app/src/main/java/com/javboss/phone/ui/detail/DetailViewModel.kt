@@ -7,11 +7,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
-import com.javboss.phone.data.api.AuthExpiredException
 import com.javboss.phone.data.api.dto.FavoriteGroupDto
 import com.javboss.phone.data.api.dto.IdolDto
 import com.javboss.phone.data.api.dto.JavDto
 import com.javboss.phone.data.api.dto.JavItemUpdateRequest
+import com.javboss.phone.data.api.dto.JavSimilarDto
 import com.javboss.phone.data.api.dto.ScreenshotDto
 import com.javboss.phone.data.api.dto.SeriesDto
 import com.javboss.phone.data.api.dto.StudioDto
@@ -25,6 +25,8 @@ data class DetailUiState(
     /** 通过 /jav?search=<code> 精确匹配拿到的完整元数据（含片商/标签/演员） */
     val javMeta: JavDto? = null,
     val seriesName: String = "",
+    /** 服务端按相似度/评分排序的推荐，最多 5 条 */
+    val similar: List<JavSimilarDto> = emptyList(),
     val screenshots: List<ScreenshotDto> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
@@ -61,10 +63,17 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
                     }.getOrNull()
                     uiState = uiState.copy(javMeta = meta)
 
+                    if (meta != null && meta.id > 0) {
+                        val similar = runCatching {
+                            container.videoRepository.listSimilarJavs(meta.id)
+                        }.getOrDefault(emptyList())
+                        uiState = uiState.copy(similar = similar)
+                    }
+
                     val sid = meta?.seriesId
                     if (sid != null && sid > 0) {
                         val series = container.videoRepository.getJavSeries(sid)
-                        if (series != null) uiState = uiState.copy(seriesName = series.name)
+                        if (series != null) uiState = uiState.copy(seriesName = series.displayName)
                     }
                 }
 
@@ -73,8 +82,6 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
                     uiState = uiState.copy(screenshots = shots)
                 }
                 uiState = uiState.copy(loading = false)
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(loading = false, sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(loading = false, error = e.message ?: "加载失败")
             }
@@ -95,8 +102,6 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 container.favoriteRepository.replaceGroups(javId, groupIds.toList())
                 uiState = uiState.copy(notice = "收藏已保存")
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "收藏保存失败")
             }
@@ -142,13 +147,11 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
                 var seriesName = uiState.seriesName
                 val sid = updated.seriesId
                 if (sid != null && sid > 0 && sid != uiState.javMeta?.seriesId) {
-                    seriesName = container.videoRepository.getJavSeries(sid)?.name ?: seriesName
+                    seriesName = container.videoRepository.getJavSeries(sid)?.displayName ?: seriesName
                 } else if (sid == null || sid <= 0) {
                     seriesName = ""
                 }
                 uiState = uiState.copy(javMeta = updated, seriesName = seriesName, notice = "已保存")
-            } catch (e: AuthExpiredException) {
-                uiState = uiState.copy(sessionExpired = true)
             } catch (e: Exception) {
                 uiState = uiState.copy(notice = "保存失败：${e.message ?: "未知错误"}")
             }
@@ -170,6 +173,9 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun screenshotUrl(videoId: Long, name: String): String =
         container.apiClient.videoScreenshotUrl(videoId, name)
+
+    fun similarCoverUrl(code: String): String =
+        container.apiClient.javCoverUrl(code)
 
     fun consumeNotice() {
         uiState = uiState.copy(notice = null)

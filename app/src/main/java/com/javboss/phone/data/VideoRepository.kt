@@ -5,6 +5,7 @@ import com.javboss.phone.data.api.dto.IdolListResponse
 import com.javboss.phone.data.api.dto.JavDto
 import com.javboss.phone.data.api.dto.JavItemUpdateRequest
 import com.javboss.phone.data.api.dto.JavListResponse
+import com.javboss.phone.data.api.dto.JavSimilarDto
 import com.javboss.phone.data.api.dto.JavTagsReplaceRequest
 import com.javboss.phone.data.api.dto.PrefixDto
 import com.javboss.phone.data.api.dto.SeriesDto
@@ -73,6 +74,10 @@ class VideoRepository(private val apiClient: ApiClient) {
 
     suspend fun listJavPrefixes(): List<PrefixDto> =
         apiClient.api().listJavPrefixes()
+
+    /** 服务端按相似度与 JavDB 评分排序，最多返回 5 条 */
+    suspend fun listSimilarJavs(javId: Long, limit: Int = 5): List<JavSimilarDto> =
+        apiClient.api().listSimilarJavs(javId, limit).items
 
     suspend fun listJavTags(): List<TagDto> =
         apiClient.api().listJavTags()

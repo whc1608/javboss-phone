@@ -81,6 +81,7 @@ fun DetailScreen(
     javCode: String?,
     onPlay: (Long) -> Unit,
     onOpenJavList: (title: String, idolIds: String, tagIds: String, studioId: Long, seriesId: Long) -> Unit,
+    onOpenSimilar: (code: String) -> Unit,
     onBack: () -> Unit,
     onSessionExpired: () -> Unit,
     viewModel: DetailViewModel = viewModel(),
@@ -104,7 +105,7 @@ fun DetailScreen(
 
     val jav = state.javMeta
     val video = state.video
-    val title = jav?.let { "${it.code} ${it.title}" }?.trim()?.takeIf { it.isNotBlank() }
+    val title = jav?.let { "${it.code} ${it.displayTitle}" }?.trim()?.takeIf { it.isNotBlank() }
         ?: video?.filename ?: javCode ?: "详情"
 
     Scaffold(
@@ -143,9 +144,9 @@ fun DetailScreen(
                     Column {
                         jav?.let {
                             Text(it.code, style = MaterialTheme.typography.titleMedium)
-                            if (it.title.isNotBlank()) {
+                            if (it.displayTitle.isNotBlank()) {
                                 Spacer(Modifier.height(4.dp))
-                                Text(it.title, style = MaterialTheme.typography.bodyMedium)
+                                Text(it.displayTitle, style = MaterialTheme.typography.bodyMedium)
                             }
                             Spacer(Modifier.height(8.dp))
                             formatReleaseDate(it.releaseUnix).takeIf { d -> d.isNotEmpty() }?.let { d ->
@@ -273,6 +274,47 @@ fun DetailScreen(
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
                         Text("JavDB")
+                    }
+                }
+
+                // 相似推荐（服务端按相似度与 JavDB 评分排序，最多 5 条）
+                if (state.similar.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("相似推荐", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(state.similar, key = { it.id }) { item ->
+                            Column(
+                                Modifier
+                                    .width(112.dp)
+                                    .clickable { onOpenSimilar(item.code) },
+                            ) {
+                                AsyncImage(
+                                    model = viewModel.similarCoverUrl(item.code),
+                                    contentDescription = item.code,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(2f / 3f),
+                                )
+                                Text(item.code, style = MaterialTheme.typography.labelSmall)
+                                if (item.displayTitle.isNotBlank()) {
+                                    Text(
+                                        text = item.displayTitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (item.rating > 0) {
+                                    Text(
+                                        text = "★ ${"%.1f".format(item.rating)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

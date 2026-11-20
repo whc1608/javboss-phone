@@ -1,6 +1,7 @@
 package com.javboss.phone.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -68,6 +69,17 @@ fun JavBossNavGraph(startWithSession: Boolean) {
         }
     }
 
+    // 401 由 ApiClient 置位（不再从拦截器抛异常），这里统一清理会话并回登录页
+    LaunchedEffect(Unit) {
+        app.container.apiClient.sessionExpired.collect { expired ->
+            if (expired) {
+                app.container.authRepository.clearLocalSession()
+                app.container.apiClient.sessionExpired.value = false
+                goLogin()
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = if (startWithSession) Routes.MAIN else Routes.LOGIN,
@@ -108,6 +120,7 @@ fun JavBossNavGraph(startWithSession: Boolean) {
                 videoId = videoId,
                 javCode = entry.arguments?.getString("code"),
                 onPlay = { navController.navigate(Routes.player(videoId)) },
+                onOpenSimilar = { code -> navController.navigate(Routes.detail(0, code)) },
                 onOpenJavList = { title, idolIds, tagIds, studioId, seriesId ->
                     navController.navigate(Routes.javList(title, idolIds, tagIds, studioId, seriesId))
                 },
