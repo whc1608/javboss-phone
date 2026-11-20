@@ -123,6 +123,7 @@ fun PlayerScreen(
             state.error != null -> Text("无法播放：${state.error}", color = MaterialTheme.colorScheme.error)
             else -> UnifiedPlayerStage(
                 urls = state.urls,
+                subtitleUrl = state.subtitleUrl,
                 engineMode = state.engineMode,
                 activeEngine = state.activeEngine,
                 autoFallback = state.engineMode == EngineMode.AUTO,
@@ -143,6 +144,7 @@ fun PlayerScreen(
 @Composable
 private fun UnifiedPlayerStage(
     urls: List<String>,
+    subtitleUrl: String?,
     engineMode: EngineMode,
     activeEngine: EngineMode,
     autoFallback: Boolean,
@@ -228,7 +230,11 @@ private fun UnifiedPlayerStage(
     LaunchedEffect(urls, sourceIndex, activeEngine, surfaceReady) {
         if (surfaceReady && sourceIndex < urls.size) {
             val raw = urls[sourceIndex]
-            engine.play(if (activeEngine == EngineMode.VLC) proxyUrl(raw) else raw, resumePositionMs)
+            engine.play(
+                if (activeEngine == EngineMode.VLC) proxyUrl(raw) else raw,
+                resumePositionMs,
+                subtitleUrl,
+            )
         }
     }
 

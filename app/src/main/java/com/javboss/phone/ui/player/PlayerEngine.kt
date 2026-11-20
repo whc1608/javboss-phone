@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.View
 import androidx.media3.common.MediaItem
 import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -18,6 +19,7 @@ import androidx.media3.ui.PlayerView
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -38,7 +40,8 @@ interface PlayerEngine {
     /** 渲染表面（ExoPlayer 用 PlayerView 关控制条，libVLC 用 VLCVideoLayout） */
     fun createView(context: Context): View
 
-    fun play(url: String, startPositionMs: Long = 0)
+    /** subtitleUrl 为本地字幕地址（可选），由引擎作为外挂字幕轨注入 */
+    fun play(url: String, startPositionMs: Long = 0, subtitleUrl: String? = null)
     fun setPlaying(playing: Boolean)
     fun seekTo(positionMs: Long)
 
@@ -102,8 +105,24 @@ class ExoPlayerEngine(context: Context, cookieHeader: String) : PlayerEngine {
             player = this@ExoPlayerEngine.player
         }
 
-    override fun play(url: String, startPositionMs: Long) {
-        player.setMediaItem(MediaItem.fromUri(url), startPositionMs)
+    override fun play(url: String, startPositionMs: Long, subtitleUrl: String?) {
+        val mediaItem = if (subtitleUrl.isNullOrBlank()) {
+            MediaItem.fromUri(url)
+        } else {
+            MediaItem.Builder()
+                .setUri(url)
+                .setSubtitleConfigurations(
+                    listOf(
+                        MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitleUrl))
+                            .setMimeType(MimeTypes.TEXT_VTT)
+                            .setLanguage("zh")
+                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                            .build(),
+                    ),
+                )
+                .build()
+        }
+        player.setMediaItem(mediaItem, startPositionMs)
         player.prepare()
         player.playWhenReady = true
     }
@@ -143,6 +162,8 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
 
     private var pendingSeekMs = -1L
     private var lastSubtitleTrackId = -1
+    /** 期望的字幕开关状态；外挂字幕轨可能在播放后才就绪，需延迟选中 */
+    private var subtitleDesired = true
 
     @Volatile
     private var buffering = false
@@ -167,14 +188,34 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
     override val durationMs: Long get() = mediaPlayer.length.coerceAtLeast(0)
     override val decoderStatus: String get() = "自动（MediaCodec 硬解优先）"
     override val subtitlesAvailable: Boolean get() = mediaPlayer.spuTracksCount > 0
-    override val subtitlesEnabled: Boolean get() = mediaPlayer.spuTrack >= 0
+    /**
+     * VLC 的外挂字幕轨在播放开始后才解析出来，setSpuTrack 只能在有轨道后调用。
+     * 播放页每 500ms 轮询本属性，借此在轨道就绪时自动选中一次（subtitleDesired=true）。
+     */
+    override val subtitlesEnabled: Boolean
+        get() {
+            val track = mediaPlayer.spuTrack
+            if (!subtitleDesired && track >= 0) {
+                lastSubtitleTrackId = track
+                mediaPlayer.setSpuTrack(-1)
+                return false
+            }
+            if (subtitleDesired && track < 0) {
+                val first = mediaPlayer.spuTracks?.firstOrNull { it.id >= 0 }?.id
+                if (first != null) mediaPlayer.setSpuTrack(first)
+            }
+            return mediaPlayer.spuTrack >= 0
+        }
 
     override fun createView(context: Context): View =
         VLCVideoLayout(context).also { mediaPlayer.attachViews(it, null, false, false) }
 
-    override fun play(url: String, startPositionMs: Long) {
+    override fun play(url: String, startPositionMs: Long, subtitleUrl: String?) {
         pendingSeekMs = startPositionMs
         val media = Media(libVlc, Uri.parse(url))
+        if (!subtitleUrl.isNullOrBlank()) {
+            media.addSlave(IMedia.Slave(IMedia.Slave.Type.Subtitle, 0, subtitleUrl))
+        }
         mediaPlayer.media = media
         media.release()
         mediaPlayer.play()
@@ -193,6 +234,7 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
     }
 
     override fun setSubtitlesEnabled(enabled: Boolean) {
+        subtitleDesired = enabled
         if (enabled) {
             val track = mediaPlayer.spuTracks
                 ?.firstOrNull { it.id >= 0 }

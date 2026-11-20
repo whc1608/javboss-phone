@@ -1,10 +1,13 @@
 package com.javboss.phone.data.localproxy
 
 import fi.iki.elonen.NanoHTTPD
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URLEncoder
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * 本地鉴权代理：libVLC 的 HTTP 模块无法注入自定义 Cookie 头，
@@ -23,6 +26,11 @@ class AuthProxy(
     private val absoluteUrl: (String) -> String,
     private val isServerUrl: (String) -> Boolean,
 ) {
+
+    companion object {
+        /** 无字幕时的空 WebVTT 轨，保持字幕轨可加载 */
+        private const val EMPTY_VTT = "WEBVTT\n\n"
+    }
 
     @Volatile
     private var server: ProxyServer? = null
@@ -46,12 +54,67 @@ class AuthProxy(
         return "$baseUrl/?url=" + URLEncoder.encode(upstreamAbsoluteUrl, "UTF-8")
     }
 
+    /**
+     * 字幕地址：播放器按普通 GET 请求本地 URL，代理内部改用 POST 调服务端
+     * /videos/{id}/subtitles/resolve 取回 VTT（服务端接口是 POST 且带会话鉴权）。
+     * 用本地地址可让两个引擎共用，避免 ExoPlayer 注入 Cookie、VLC 无法注入 Cookie 的差异。
+     */
+    fun subtitleUrl(videoId: Long): String = "$baseUrl/subtitle/$videoId.vtt"
+
+    /** 解析 /subtitle/{id}.vtt，返回 videoId；非字幕路径返回 null */
+    private fun subtitlePathId(uri: String): Long? {
+        val rest = uri.removePrefix(capabilityPath)
+        if (!rest.startsWith("/subtitle/") || !rest.endsWith(".vtt")) return null
+        return rest.removePrefix("/subtitle/").removeSuffix(".vtt").toLongOrNull()
+    }
+
     private inner class ProxyServer : NanoHTTPD("127.0.0.1", 0) {
+
+        /**
+         * 同步请求服务端字幕：204/失败返回最小合法 VTT（空轨），
+         * 保证字幕轨始终可加载，播放器不会因为 404/204 把字幕当错误处理。
+         */
+        private fun serveSubtitle(videoId: Long): Response {
+            val upstream = absoluteUrl("videos/$videoId/subtitles/resolve")
+            val request = Request.Builder()
+                .url(upstream)
+                .post("""{"format":"vtt"}""".toRequestBody("application/json".toMediaType()))
+                .header("Accept-Encoding", "identity")
+                .header("User-Agent", "JavBossPhone/0.1")
+                .build()
+            // 服务端首次下载字幕最长约 45s，单独放宽读超时；连接池与 CookieJar 仍共享。
+            val subtitleClient = okHttpClient.newBuilder()
+                .readTimeout(60, TimeUnit.SECONDS)
+                .build()
+            val upstreamResp = try {
+                subtitleClient.newCall(request).execute()
+            } catch (_: Exception) {
+                null
+            }
+            if (upstreamResp != null && upstreamResp.code == 200) {
+                val body = upstreamResp.body
+                if (body != null) {
+                    val stream = body.byteStream()
+                    val length = body.contentLength()
+                    // 与视频流同理：流由 NanoHTTPD 发送线程异步消费，不能在此关闭 upstreamResp。
+                    return if (length >= 0) {
+                        newFixedLengthResponse(Response.Status.OK, "text/vtt", stream, length)
+                    } else {
+                        newChunkedResponse(Response.Status.OK, "text/vtt", stream)
+                    }
+                }
+            }
+            upstreamResp?.close()
+            // 无字幕/失败返回最小合法 VTT（空轨），避免播放器把 204/错误当作字幕加载失败。
+            return newFixedLengthResponse(Response.Status.OK, "text/vtt", EMPTY_VTT)
+        }
 
         override fun serve(session: IHTTPSession): Response {
             if (session.uri != capabilityPath && !session.uri.startsWith("$capabilityPath/")) {
                 return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "proxy token required")
             }
+            val subtitleId = subtitlePathId(session.uri)
+            if (subtitleId != null) return serveSubtitle(subtitleId)
             val upstream = try {
                 val explicit = session.parameters["url"]?.firstOrNull()
                 explicit ?: run {

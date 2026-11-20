@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 
 data class PlayerUiState(
     val urls: List<String> = emptyList(),
+    /** 外挂字幕地址（本地鉴权代理），由播放器作为字幕轨注入 */
+    val subtitleUrl: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
     /** 用户设置的引擎偏好（自动 / 仅 ExoPlayer / 仅 libVLC） */
@@ -43,6 +45,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     val mode = container.settings.engineMode
                     uiState = PlayerUiState(
                         urls = urls,
+                        subtitleUrl = container.authProxy.subtitleUrl(videoId),
                         loading = false,
                         engineMode = mode,
                         activeEngine = if (mode == EngineMode.VLC) EngineMode.VLC else EngineMode.EXO,
